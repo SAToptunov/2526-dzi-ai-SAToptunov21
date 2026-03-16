@@ -50,3 +50,8 @@ plt.savefig(os.path.join(PLOTS_DIR, 'eda_3_heatmap.png'))
 plt.close()
 
 print(f"✅ Готово! Твоите 3 графики те чакат в папка: {os.path.abspath(PLOTS_DIR)}")
+
+from statsmodels.graphics.tsaplots import plot_acf
+plot_acf(df['Close'], lags=30)
+plt.title('Автокорелация на цената на Биткойн (ACF)')
+plt.show()
