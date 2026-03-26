@@ -15,8 +15,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 SYMBOL = 'BTC-USD'
 LOOK_BACK = 14
 SIMULATION_DAYS = 100  # Колко дни назад искаме да симулираме
-MODELS_DIR = '../models'
-PLOTS_DIR = '../plots'
+MODELS_DIR = '../../models'
+PLOTS_DIR = '../../plots'
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 print("==================================================")

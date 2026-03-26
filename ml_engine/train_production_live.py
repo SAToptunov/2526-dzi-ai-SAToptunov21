@@ -20,7 +20,7 @@ random.seed(42)
 SYMBOL = 'BTC-USD'
 START_DATE = '2020-01-01'
 LOOK_BACK = 20
-MODELS_DIR = '../models'
+MODELS_DIR = '../../models'
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 

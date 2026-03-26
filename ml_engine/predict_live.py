@@ -16,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 # --- КОНФИГУРАЦИЯ ---
 SYMBOL = 'BTC-USD'
 LOOK_BACK = 60
-MODELS_DIR = '../models'
+MODELS_DIR = '../../models'
 
 print("==================================================")
 print(f"🤖 СТАРТИРАНЕ НА AI ПРОГНОЗА ЗА {SYMBOL} 🤖")
