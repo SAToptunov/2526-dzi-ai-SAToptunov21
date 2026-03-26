@@ -10,8 +10,8 @@ from statsmodels.tsa.arima.model import ARIMA
 
 # Настройки за визуализация
 plt.style.use('ggplot')
-MODELS_DIR = 'models'
-PLOTS_DIR = 'plots'
+MODELS_DIR = '../models'
+PLOTS_DIR = '../plots'
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
@@ -19,8 +19,8 @@ os.makedirs(PLOTS_DIR, exist_ok=True)
 # 1. ЗАРЕЖДАНЕ НА ДАННИ
 # ==========================================
 print("📥 Зареждане на данни...")
-X_train_3d = np.load('X_train.npy')
-y_train = np.load('y_train.npy')
+X_train_3d = np.load('../data/X_train.npy')
+y_train = np.load('../data/y_train.npy')
 
 # Зареждаме скалера
 scaler = joblib.load(os.path.join(MODELS_DIR, 'scaler.gz'))
