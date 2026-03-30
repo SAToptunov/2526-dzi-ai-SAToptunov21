@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <h2 class="mb-4 text-danger fw-bold">⚙️ Административен Панел (MLOps)</h2>
+        
+        <div class="card p-4 border-danger shadow-sm">
+            <h4 class="card-title">Управление на Невронната Мрежа</h4>
+            <hr>
+            <p><strong>Изкуствен Интелект:</strong> Stacked LSTM Model (CADS)</p>
+            <p><strong>Последно обучение на модела:</strong> <span class="badge bg-secondary fs-6">{{ last_trained }}</span></p>
+            
+            <div class="alert alert-warning mt-3">
+                <strong>Внимание:</strong> Стартирането на пре-обучение ще изтегли най-новите пазарни данни до днешния ден ({{ range_date }}) и ще актуализира теглата на невронната мрежа. Процесът отнема системни ресурси и трае няколко минути.
+            </div>
+            
+            <button id="retrainBtn" class="btn btn-danger btn-lg mt-2" onclick="startRetraining()">
+                🔥 СТАРТИРАЙ ПРЕ-ОБУЧЕНИЕ (RETRAIN)
+            </button>
+            
+            <div id="retrainStatus" class="mt-4" style="display: none;">
+                <div class="spinner-border text-danger" role="status"></div>
+                <span class="ms-2 fw-bold text-danger">Обучението стартира на сървъра. Моля, проверете конзолата за прогрес...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function startRetraining() {
+        const btn = document.getElementById('retrainBtn');
+        const status = document.getElementById('retrainStatus');
+        
+        if (!confirm("Сигурни ли сте, че искате да стартирате обучение на модела?")) {
+            return;
+        }
+        
+        btn.disabled = true;
+        status.style.display = 'block';
+        
+        try {
+            const response = await fetch('/api/retrain', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.error) {
+                alert("Грешка: " + data.error);
+                status.style.display = 'none';
+                btn.disabled = false;
+            } else {
+                alert("✅ " + data.message);
+                // Оставяме бутона деактивиран, за да не се клика 2 пъти
+                status.innerHTML = `<span class="text-success fw-bold">✅ ${data.message}</span>`;
+            }
+        } catch (error) {
+            alert("Грешка при връзка със сървъра.");
+            status.style.display = 'none';
+            btn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}
