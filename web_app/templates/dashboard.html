@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 text-center mb-4">
+        <h2 class="fw-bold">Пазарен Анализ: Bitcoin (BTC-USD)</h2>
+        <p class="text-muted">Данните се извличат в реално време. Натиснете бутона за стартиране на невронната мрежа.</p>
+        <button id="runAiBtn" class="btn btn-dark btn-lg px-5" onclick="runPrediction()">
+            ⚙️ Стартирай LSTM Анализ
+        </button>
+    </div>
+</div>
+
+<!-- Секция за Зареждане (Скрита по подразбиране) -->
+<div id="loader" class="text-center my-5" style="display: none;">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+    <h5 class="mt-3 text-muted">Извличане на данни и AI изчисления...</h5>
+</div>
+
+<!-- Панел с Резултатите (Скрит по подразбиране) -->
+<div id="resultsPanel" style="display: none;">
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center p-3 border-primary">
+                <h6 class="text-muted">Текуща цена (Днес)</h6>
+                <h3 id="currentPrice" class="fw-bold text-dark">---</h3>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center p-3 border-success">
+                <h6 class="text-muted">AI Прогноза (Утре)</h6>
+                <h3 id="predictedPrice" class="fw-bold text-success">---</h3>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div id="statusCard" class="card text-center p-3 border-secondary">
+                <h6 class="text-muted">Статус на пазара</h6>
+                <h3 id="marketStatus" class="fw-bold text-secondary">---</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Графиката -->
+    <div class="card p-4">
+        <canvas id="cryptoChart" height="100"></canvas>
+    </div>
+</div>
+
+<script>
+    let myChart = null;
+
+    async function runPrediction() {
+        const btn = document.getElementById('runAiBtn');
+        const loader = document.getElementById('loader');
+        const resultsPanel = document.getElementById('resultsPanel');
+        
+        // Показваме зареждането
+        btn.disabled = true;
+        resultsPanel.style.display = 'none';
+        loader.style.display = 'block';
+
+        try {
+            // Извикваме нашия Python API
+            const response = await fetch('/api/predict');
+            const data = await response.json();
+
+            if (data.error) {
+                alert("Грешка от сървъра: " + data.error);
+                return;
+            }
+
+            // Попълваме числата в картите
+            document.getElementById('currentPrice').innerText = "$" + data.current_price.toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('predictedPrice').innerText = "$" + data.predicted_price.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            // Логика за Аномалия
+            const statusCard = document.getElementById('statusCard');
+            const statusText = document.getElementById('marketStatus');
+            
+            if (data.is_anomaly) {
+                statusCard.className = "card text-center p-3 border-danger bg-danger text-white";
+                statusText.className = "fw-bold text-white";
+                statusText.innerText = "⚠️ АНОМАЛИЯ / ВИСОК РИСК";
+            } else {
+                statusCard.className = "card text-center p-3 border-success bg-light";
+                statusText.className = "fw-bold text-success";
+                statusText.innerText = "✅ НОРМАЛЕН ТРЕНД";
+            }
+
+            // Рисуваме графиката
+            drawChart(data);
+
+            // Показваме панела
+            loader.style.display = 'none';
+            resultsPanel.style.display = 'block';
+            btn.disabled = false;
+
+        } catch (error) {
+            alert("Грешка при връзката със сървъра!");
+            loader.style.display = 'none';
+            btn.disabled = false;
+        }
+    }
+
+    function drawChart(data) {
+        const ctx = document.getElementById('cryptoChart').getContext('2d');
+        
+        if (myChart) {
+            myChart.destroy(); // Изтриваме старата графика, ако има такава
+        }
+
+        // Подготвяме масивите за линията на прогнозата
+        // Искаме тя да се свърже с последната точка от реалната цена
+        let predictionArray = new Array(data.history_prices.length).fill(null);
+        predictionArray[predictionArray.length - 1] = data.current_price; // Свързваща точка
+        predictionArray.push(data.predicted_price); // Прогнозата за утре
+
+        // Добавяме null към историята, за да имат еднаква дължина масивите
+        let historyArray = [...data.history_prices, null];
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets:[
+                    {
+                        label: 'Реална историческа цена ($)',
+                        data: historyArray,
+                        borderColor: '#212529',
+                        backgroundColor: 'rgba(33, 37, 41, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: true
+                    },
+                    {
+                        label: 'AI Прогноза',
+                        data: predictionArray,
+                        borderColor: data.is_anomaly ? '#dc3545' : '#198754', // Червено ако е аномалия, зелено ако е ок
+                        borderWidth: 3,
+                        borderDash:[5, 5], // Пунктирана линия
+                        pointBackgroundColor: data.is_anomaly ? '#dc3545' : '#198754',
+                        pointRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: { beginAtZero: false }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Моята история на анализите</h2>
+<div class="card p-4">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Дата на анализ</th>
+                <th>Актив</th>
+                <th>Реална цена ($)</th>
+                <th>Прогноза на AI ($)</th>
+                <th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ log.symbol }}</td>
+                <td>${{ "{:,.2f}".format(log.current_price) }}</td>
+                <td>${{ "{:,.2f}".format(log.predicted_price) }}</td>
+                <td>
+                    {% if log.is_anomaly %}
+                    <span class="badge bg-danger">Аномалия</span>
+                    {% else %}
+                    <span class="badge bg-success">Нормално</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center">Все още нямате направени анализи. Отидете в AI Таблото.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
