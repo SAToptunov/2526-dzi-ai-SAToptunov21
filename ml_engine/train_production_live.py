@@ -7,10 +7,10 @@ import tensorflow as tf
 import random
 
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 
 # --- FIX SEED ---
 np.random.seed(42)
@@ -20,16 +20,12 @@ random.seed(42)
 # --- CONFIG ---
 SYMBOL = 'BTC-USD'
 START_DATE = '2020-01-01'
-LOOK_BACK = 35 #35
-MODELS_DIR = '../../models'
-PLOTS_DIR = '../../plots'
+LOOK_BACK = 35
+MODELS_DIR = '../models'
+PLOTS_DIR = '../plots'
 
 os.makedirs(MODELS_DIR, exist_ok=True)
-os.makedirs(PLOTS_DIR, exist_ok=True)
 
-# ==========================================
-# 1. DATA PREP
-# ==========================================
 print("📥 1. Сваляне и обработка...")
 
 df = yf.download(SYMBOL, start=START_DATE)
@@ -44,60 +40,49 @@ df.dropna(inplace=True)
 # Target
 df['Target'] = df['Close']
 
-# Split
-train_size = int(len(df) * 0.85)
-train_df = df.iloc[:train_size]
-test_df = df.iloc[train_size:]
-
-# Scale
-features = ['Close', 'SMA_7', 'Volatility']
+# Scale (на 100% от данните)
+features = ['Close', 'SMA_7', 'Volatility'] # <--- 3 ПРИЗНАКА
 scaler = MinMaxScaler(feature_range=(0, 1))
-train_scaled = scaler.fit_transform(train_df[features])
-test_scaled = scaler.transform(test_df[features])
+
+data_scaled = scaler.fit_transform(df[features])
 
 joblib.dump(scaler, os.path.join(MODELS_DIR, 'scaler.gz'))
 
-def create_sequences(data, look_back=60):
+def create_sequences(data, look_back):
     X, y = [], []
     for i in range(look_back, len(data)):
         X.append(data[i-look_back:i])
         y.append(data[i, 0])
     return np.array(X), np.array(y)
 
-X_train, y_train = create_sequences(train_scaled, LOOK_BACK)
-X_test, y_test = create_sequences(test_scaled, LOOK_BACK)
+X_all, y_all = create_sequences(data_scaled, LOOK_BACK)
 
-# Validation Split
-val_split = int(len(X_train) * 0.9)
-X_val, y_val = X_train[val_split:], y_train[val_split:]
-X_train, y_train = X_train[:val_split], y_train[:val_split]
+# Валидационен сплит от края (10%)
+val_split = int(len(X_all) * 0.9)
+X_train, y_train = X_all[:val_split], y_all[:val_split]
+X_val, y_val = X_all[val_split:], y_all[val_split:]
 
-print(f"Shapes -> Train: {X_train.shape}, Test: {X_test.shape}")
+print(f"Shapes -> Train: {X_train.shape}")
 
 # ==========================================
 # 2. MODEL (LSTM)
 # ==========================================
 print("🧠 2. Обучение (LSTM)...")
 
-from tensorflow.keras.callbacks import EarlyStopping # Увери се, че това е импортирано горе!
-
 model = Sequential()
 
-model.add(LSTM(units=128, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+model.add(LSTM(units=128, return_sequences=True, input_shape=(LOOK_BACK, 3))) # <--- 3 ПРИЗНАКА
 model.add(Dropout(0.1))
-
 model.add(LSTM(units=64, return_sequences=False))
 model.add(Dropout(0.1))
-
 model.add(Dense(units=1))
 
-# Намаляваме леко скоростта на учене за по-голяма точност
 optimizer = Adam(learning_rate=0.0005)
 model.compile(optimizer=optimizer, loss='huber')
 
 early_stop = EarlyStopping(monitor='val_loss', patience=12, restore_best_weights=True)
 
-history = model.fit(
+model.fit(
     X_train, y_train,
     epochs=200,
     batch_size=16,
@@ -106,34 +91,5 @@ history = model.fit(
     verbose=1
 )
 
-# 5. Запазване
 model.save(os.path.join(MODELS_DIR, 'bitcoin_lstm_live.keras'))
-print("\n==================================================")
-print("✅ ПРОДУКЦИОННИЯТ МОДЕЛ Е ГОТОВ И ЗАПАЗЕН!")
-print("Той вече е обучен на данни до днешния ден и е готов за интеграция в уебсайта.")
-print("==================================================")
-
-preds_scaled = model.predict(X_test)
-
-def inverse_transform_predictions(predictions, scaler):
-    dummy = np.zeros((len(predictions), 3))
-    dummy[:, 0] = predictions.flatten()
-    return scaler.inverse_transform(dummy)[:, 0]
-
-preds_real = inverse_transform_predictions(preds_scaled, scaler)
-
-dummy_y = np.zeros((len(y_test), 3))
-dummy_y[:, 0] = y_test
-y_test_real = scaler.inverse_transform(dummy_y)[:, 0]
-
-# --- МЕТРИКИ В ДОЛАРИ ($) ---
-mae = mean_absolute_error(y_test_real, preds_real)
-rmse = np.sqrt(mean_squared_error(y_test_real, preds_real))
-r2 = r2_score(y_test_real, preds_real)
-
-print(f"\n=================================")
-print(f"🏆 РЕЗУЛТАТИ (LSTM):")
-print(f"MAE (Средна грешка): ${mae:.2f}")
-print(f"RMSE: ${rmse:.2f}")
-print(f"R2 Score: {r2:.4f}")
-print(f"=================================")
+print("✅ LSTM моделът е запазен.")

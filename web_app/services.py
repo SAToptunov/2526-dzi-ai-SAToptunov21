@@ -45,24 +45,27 @@ def generate_live_prediction(user_id):
     df['Volatility'] = df['Close'].rolling(window=7).std()
     df.dropna(inplace=True)
 
-    last_60 = df.iloc[-60:][['Close', 'SMA_7', 'Volatility']].values
+    # ПОПРАВКА 1: Махаме .values, за да запазим DataFrame формата с имената на колоните
+    last_60_df = df.iloc[-35:][['Close', 'SMA_7', 'Volatility']]
     current_price = float(df['Close'].iloc[-1])
 
-    # 3. AI Предсказание
-    last_60_scaled = scaler.transform(last_60)
-    X_input = last_60_scaled.reshape(1, 60, 3)
+    # 3. AI Предсказание (Подаваме DataFrame на скалера)
+    last_60_scaled = scaler.transform(last_60_df)
+    X_input = last_60_scaled.reshape(1, 35, 3)
     pred_scaled = model.predict(X_input, verbose=0)
 
     # 4. Обратно скалиране
     dummy = np.zeros((1, 3))
     dummy[0, 0] = pred_scaled[0, 0]
-    predicted_price = float(scaler.inverse_transform(dummy)[0, 0])
 
-    # 5. Логика за аномалия (> 5% разлика)
-    diff_pct = abs(predicted_price - current_price) / current_price
-    is_anomaly = bool(diff_pct > 0.05)
+    # ПОПРАВКА 2: Превръщаме dummy масива също в DataFrame с точните имена
+    dummy_df = pd.DataFrame(dummy, columns=['Close', 'SMA_7', 'Volatility'])
+    predicted_price = float(scaler.inverse_transform(dummy_df)[0, 0])
 
     # 6. Запис в Базата данни
+    diff_pct = abs((predicted_price - current_price) / current_price) if current_price != 0 else 0
+    is_anomaly = bool(diff_pct > 0.05)
+
     new_log = PredictionLog(
         user_id=user_id,
         current_price=current_price,
