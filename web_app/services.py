@@ -11,7 +11,7 @@ from .models import PredictionLog
 
 # Пътища до ML моделите (извън web_app папката)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-MODEL_PATH = os.path.join(BASE_DIR, 'models', 'bitcoin_lstm.keras')
+MODEL_PATH = os.path.join(BASE_DIR, 'models', 'bitcoin_lstm_live.keras')
 SCALER_PATH = os.path.join(BASE_DIR, 'models', 'scaler.gz')
 
 model = None
