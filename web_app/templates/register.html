@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 60vh;">
+    <div class="col-md-5 col-lg-4">
+        <div class="card p-4 shadow border-primary">
+            <div class="text-center mb-4">
+                <i class="fa-solid fa-user-plus fs-1 text-primary mb-3"></i>
+                <h3 class="fw-bold">Нов профил</h3>
+            </div>
+            <form method="POST" action="/register">
+                <div class="mb-3">
+                    <label class="form-label text-muted small text-uppercase">Потребителско име</label>
+                    <input type="text" name="username" class="form-control form-control-lg" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label text-muted small text-uppercase">Парола</label>
+                    <input type="password" name="password" class="form-control form-control-lg" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">Създай акаунт</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

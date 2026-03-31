@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h2 class="fw-bold m-0 text-dark"><i class="fa-brands fa-bitcoin text-warning me-2"></i>Bitcoin (BTC-USD) Анализ</h2>
+        <span class="badge bg-light text-dark border mt-2"><i class="fa-solid fa-circle text-success me-1" style="font-size: 8px;"></i> API Status: Online & Synced</span>
+    </div>
+    <button id="runAiBtn" class="btn btn-primary btn-lg shadow-sm px-4 rounded-pill" onclick="runPrediction()">
+        <i class="fa-solid fa-microchip me-2"></i>Генерирай Прогноза
+    </button>
+</div>
+
+<!-- Секция за Зареждане -->
+<div id="loader" class="card p-5 text-center shadow-sm my-5" style="display: none; border: 2px dashed #cbd5e1;">
+    <div class="spinner-border text-primary mx-auto mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+    <h4 class="text-dark fw-bold">Извличане на данни & Обучение на тензори...</h4>
+    <p class="text-muted-custom mb-0">Моля изчакайте, LSTM мрежата обработва пазарната история.</p>
+</div>
+
+<!-- Панел с Резултатите -->
+<div id="resultsPanel" style="display: none;">
+
+    <div class="row mb-4 g-4">
+        <!-- Текуща Цена -->
+        <div class="col-md-4">
+            <div class="card p-4 h-100 border-0 shadow-sm text-center bg-white">
+                <div class="text-muted-custom text-uppercase fw-bold mb-3 fs-6"><i class="fa-solid fa-calendar-day me-2"></i>Текуща цена (Днес)</div>
+                <h2 id="currentPrice" class="fw-bolder mb-0 text-dark fs-1">---</h2>
+            </div>
+        </div>
+
+        <!-- AI Прогноза -->
+        <div class="col-md-4">
+            <div class="card p-4 h-100 border-0 shadow text-center" style="background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); border-top: 4px solid #3b82f6 !important;">
+                <div class="text-primary-custom text-uppercase fw-bold mb-3 fs-6"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>AI Прогноза (Утре)</div>
+                <h2 id="predictedPrice" class="fw-bolder mb-0 text-primary fs-1">---</h2>
+            </div>
+        </div>
+
+        <!-- Пазарен Статус -->
+        <div class="col-md-4">
+            <div id="statusCard" class="card p-4 h-100 border-0 shadow-sm text-center">
+                <div class="text-muted-custom text-uppercase fw-bold mb-3 fs-6"><i class="fa-solid fa-shield-halved me-2"></i>Пазарен Статус</div>
+                <h2 id="marketStatus" class="fw-bolder mb-0 fs-3">---</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- Графиката -->
+    <div class="card p-4 shadow-sm border-0 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold text-dark m-0"><i class="fa-solid fa-chart-area me-2 text-primary"></i>Проекция на ценовия тренд</h5>
+            <span class="badge bg-light text-muted border">Последни 30 дни + Прогноза</span>
+        </div>
+        <div style="height: 450px; width: 100%;">
+            <canvas id="cryptoChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    let myChart = null;
+
+    async function runPrediction() {
+        const btn = document.getElementById('runAiBtn');
+        const loader = document.getElementById('loader');
+        const resultsPanel = document.getElementById('resultsPanel');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Анализиране...';
+        resultsPanel.style.display = 'none';
+        loader.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/predict');
+            const data = await response.json();
+
+            if (data.error) throw new Error(data.error);
+
+            // Попълване на числата
+            document.getElementById('currentPrice').innerText = "$" + data.current_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('predictedPrice').innerText = "$" + data.predicted_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            // Логика за Аномалия
+            const statusCard = document.getElementById('statusCard');
+            const statusText = document.getElementById('marketStatus');
+
+            if (data.is_anomaly) {
+                statusCard.style.backgroundColor = "#fff1f2"; // Много светло червено
+                statusCard.style.borderTop = "4px solid #ef4444";
+                statusText.className = "fw-bolder text-danger";
+                statusText.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-2"></i>АНОМАЛИЯ';
+            } else {
+                statusCard.style.backgroundColor = "#ecfdf5"; // Много светло зелено
+                statusCard.style.borderTop = "4px solid #10b981";
+                statusText.className = "fw-bolder text-success";
+                statusText.innerHTML = '<i class="fa-solid fa-check-circle me-2"></i>НОРМАЛЕН ТРЕНД';
+            }
+
+            drawChart(data);
+
+            loader.style.display = 'none';
+            resultsPanel.style.display = 'block';
+
+        } catch (error) {
+            alert("Сървърна грешка: " + error.message);
+            loader.style.display = 'none';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-microchip me-2"></i>Генерирай Прогноза';
+        }
+    }
+
+    function drawChart(data) {
+        const ctx = document.getElementById('cryptoChart').getContext('2d');
+        if (myChart) myChart.destroy();
+
+        let predictionArray = new Array(data.history_prices.length).fill(null);
+        predictionArray[predictionArray.length - 1] = data.current_price;
+        predictionArray.push(data.predicted_price);
+
+        let historyArray = [...data.history_prices, null];
+
+        let predColor = data.is_anomaly ? '#ef4444' : '#10b981';
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets:[
+                    {
+                        label: 'Реална Цена (USD)',
+                        data: historyArray,
+                        borderColor: '#334155', // Тъмно сиво за контраст на бял фон
+                        backgroundColor: 'rgba(51, 65, 85, 0.05)', // Много лека сива сянка отдолу
+                        borderWidth: 2.5,
+                        tension: 0.1,
+                        fill: true,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#3b82f6'
+                    },
+                    {
+                        label: 'AI Прогноза',
+                        data: predictionArray,
+                        borderColor: predColor,
+                        borderWidth: 3,
+                        borderDash:[5, 5],
+                        pointBackgroundColor: predColor,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#334155', font: { weight: 'bold', family: 'Segoe UI' } }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: { size: 14 },
+                        bodyFont: { size: 14 },
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#f1f5f9', drawBorder: false },
+                        ticks: { color: '#64748b', maxRotation: 45, minRotation: 45 }
+                    },
+                    y: {
+                        grid: { color: '#f1f5f9', drawBorder: false },
+                        ticks: {
+                            color: '#64748b',
+                            callback: function(value) { return '$' + value.toLocaleString(); }
+                        }
+                    }
+                },
+                interaction: { intersect: false, mode: 'index' }
+            }
+        });
+    }
+</script>
+{% endblock %}

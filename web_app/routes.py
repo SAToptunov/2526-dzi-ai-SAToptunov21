@@ -1,18 +1,97 @@
-from flask import Blueprint, render_template, jsonify
-from models import PredictionLog
+import threading
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash
+from flask_login import login_user, logout_user, login_required, current_user
+from .extensions import db
+from .models import User, PredictionLog
+from . import services
 
 main_bp = Blueprint('main', __name__)
 
+
+# ================= AUTH ROUTES =================
+@main_bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated: return redirect(url_for('main.dashboard'))
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        if User.query.filter_by(username=username).first():
+            flash('Потребителското име вече е заето.', 'danger')
+            return redirect(url_for('main.register'))
+
+        new_user = User(username=username)
+        new_user.set_password(password)
+        if username.lower() == 'admin': new_user.role = 'admin'
+
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Успешна регистрация!', 'success')
+        return redirect(url_for('main.login'))
+    return render_template('register.html')
+
+
+@main_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated: return redirect(url_for('main.dashboard'))
+    if request.method == 'POST':
+        user = User.query.filter_by(username=request.form.get('username')).first()
+        if user and user.check_password(request.form.get('password')):
+            login_user(user)
+            return redirect(url_for('main.dashboard'))
+        flash('Грешни данни.', 'danger')
+    return render_template('login.html')
+
+
+@main_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('main.index'))
+
+
+# ================= APP ROUTES =================
 @main_bp.route('/')
-def home():
-    return render_template('base.html')
+def index(): return render_template('index.html')
+
+
+@main_bp.route('/about')
+def about(): return render_template('about.html')
+
 
 @main_bp.route('/dashboard')
-def dashboard():
-    return "<h1>Dashboard - Chart Loading...</h1>"
+@login_required
+def dashboard(): return render_template('dashboard.html')
 
-@main_bp.route('/api/history')
-def history_api():
-    logs = PredictionLog.query.order_by(PredictionLog.date_predicted.desc()).limit(10).all()
-    results = [{"date": log.date_predicted, "price": log.predicted_price} for log in logs]
-    return jsonify(results)
+
+@main_bp.route('/history')
+@login_required
+def history():
+    logs = PredictionLog.query.filter_by(user_id=current_user.id).order_by(PredictionLog.timestamp.desc()).all()
+    return render_template('history.html', logs=logs)
+
+
+@main_bp.route('/admin')
+@login_required
+def admin_panel():
+    if current_user.role != 'admin': return redirect(url_for('main.dashboard'))
+    return render_template('admin.html', last_trained="Проверете логовете")
+
+
+# ================= API ROUTES =================
+@main_bp.route('/api/predict', methods=['GET'])
+@login_required
+def get_prediction():
+    try:
+        result = services.generate_live_prediction(current_user.id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route('/api/retrain', methods=['POST'])
+@login_required
+def api_retrain():
+    if current_user.role != 'admin': return jsonify({"error": "Отказан достъп."}), 403
+    threading.Thread(target=services.retrain_model_background).start()
+    return jsonify({"message": "Пре-обучението стартира на заден фон."})

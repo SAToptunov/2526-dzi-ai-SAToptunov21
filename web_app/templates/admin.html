@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center mb-4">
+            <i class="fa-solid fa-server fs-2 text-danger me-3"></i>
+            <div>
+                <h2 class="m-0 fw-bold text-danger">Административен Панел</h2>
+                <span class="text-muted">MLOps & Model Lifecycle Management</span>
+            </div>
+        </div>
+        
+        <div class="card p-4 border-danger shadow">
+            <h4 class="fw-bold"><i class="fa-solid fa-brain me-2"></i>Пре-обучение на Невронната Мрежа</h4>
+            <hr style="border-color: #2d3748;">
+            
+            <div class="row mb-4">
+                <div class="col-6">
+                    <p class="text-muted mb-1">Активен модел:</p>
+                    <h5 class="text-white">LSTM_v2_Production.keras</h5>
+                </div>
+                <div class="col-6">
+                    <p class="text-muted mb-1">Време на последен ъпдейт:</p>
+                    <h5 class="text-white"><span class="badge bg-secondary">{{ last_trained }}</span></h5>
+                </div>
+            </div>
+            
+            <div class="alert bg-dark border-warning text-warning d-flex align-items-center">
+                <i class="fa-solid fa-circle-exclamation fs-3 me-3"></i>
+                <div>
+                    <strong>Внимание:</strong> Стартирането на пре-обучение (Retrain) ще изтегли най-новите пазарни данни до днешния ден и ще инициира 100 епохи обучение. Процесът натоварва сървъра и отнема време.
+                </div>
+            </div>
+            
+            <button id="retrainBtn" class="btn btn-danger btn-lg mt-2 fw-bold" onclick="startRetraining()">
+                <i class="fa-solid fa-fire me-2"></i>СТАРТИРАЙ ОБУЧЕНИЕ (RETRAIN)
+            </button>
+            
+            <div id="retrainStatus" class="mt-4 p-3 bg-dark rounded border border-secondary" style="display: none;">
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border text-danger me-3" role="status"></div>
+                    <div>
+                        <h5 class="text-danger m-0">Обучението стартира на бекенд сървъра...</h5>
+                        <small class="text-muted">Моля, проверете Python конзолата за лог на епохите.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function startRetraining() {
+        if (!confirm("Внимание! Това ще презапише текущите тегла на модела. Сигурни ли сте?")) return;
+        
+        const btn = document.getElementById('retrainBtn');
+        const status = document.getElementById('retrainStatus');
+        
+        btn.disabled = true;
+        status.style.display = 'block';
+        
+        try {
+            const response = await fetch('/api/retrain', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.error) throw new Error(data.error);
+            
+            status.innerHTML = `<div class="alert alert-success m-0"><i class="fa-solid fa-check-circle me-2"></i> ${data.message}</div>`;
+        } catch (error) {
+            alert("Грешка при комуникация със сървъра.");
+            status.style.display = 'none';
+            btn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}

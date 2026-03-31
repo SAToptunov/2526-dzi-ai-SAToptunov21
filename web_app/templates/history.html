@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <h2 class="fw-bold text-dark m-0"><i class="fa-solid fa-list-ul me-2 text-primary"></i>История на анализите</h2>
+    <span class="badge bg-light text-dark border px-3 py-2"><i class="fa-solid fa-database text-muted me-1"></i> SQLite Sync</span>
+</div>
+
+<div class="card border-0 shadow-sm overflow-hidden mb-5">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th class="py-3 px-4 text-muted fw-bold"># ID</th>
+                    <th class="py-3 text-muted fw-bold">Време (UTC)</th>
+                    <th class="py-3 text-muted fw-bold">Актив</th>
+                    <th class="py-3 text-muted fw-bold">Реална цена</th>
+                    <th class="py-3 text-primary fw-bold">Прогноза</th>
+                    <th class="py-3 text-muted fw-bold">Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="px-4 text-muted small">SYS-{{ log.id }}</td>
+                    <td class="fw-medium text-dark">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><span class="badge bg-light text-dark border"><i class="fa-brands fa-bitcoin text-warning me-1"></i>{{ log.symbol }}</span></td>
+                    <td class="fw-bold text-dark">${{ "{:,.2f}".format(log.current_price) }}</td>
+                    <td class="fw-bold text-primary">${{ "{:,.2f}".format(log.predicted_price) }}</td>
+                    <td>
+                        {% if log.is_anomaly %}
+                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-2 py-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> Аномалия</span>
+                        {% else %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1"><i class="fa-solid fa-check me-1"></i> Нормално</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-folder-open fs-1 text-light mb-3"></i><br>
+                        Все още нямате направени анализи. Отидете в AI Таблото, за да генерирате първата си прогноза.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

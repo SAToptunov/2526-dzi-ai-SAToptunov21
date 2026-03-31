@@ -1,14 +1,143 @@
 <!DOCTYPE html>
-<html>
-<head><title>CADS System</title></head>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CADS | Crypto AI Analytics</title>
+    <!-- Bootstrap 5 CSS (Light) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* Модерен Светъл Корпоративен Дизайн */
+        body {
+            background-color: #f8f9fa; /* Много светло сиво, почти бяло */
+            color: #212529; /* Тъмно сиво за текста (по-четливо от чисто черно) */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Навигационната лента остава тъмна за контраст (класически стил) */
+        .navbar {
+            background-color: #0f172a !important; /* Тъмно синьо-сиво */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .navbar-brand {
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #ffffff !important;
+        }
+        .nav-link { color: #e2e8f0 !important; font-weight: 500; transition: color 0.2s;}
+        .nav-link:hover { color: #3b82f6 !important; }
+
+        /* Картите са бели с лека сянка */
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        /* Формуляри */
+        .form-control {
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+        }
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+        }
+
+        /* Бутони */
+        .btn-primary { background-color: #2563eb; border: none; font-weight: 600;}
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-outline-primary { border-color: #2563eb; color: #2563eb; font-weight: 600;}
+        .btn-outline-primary:hover { background-color: #2563eb; color: #fff; }
+        .btn-success { background-color: #10b981; border: none; font-weight: 600;}
+        .btn-danger { background-color: #ef4444; border: none; font-weight: 600;}
+
+        /* Текстови акценти */
+        .text-primary-custom { color: #2563eb !important; }
+        .text-muted-custom { color: #64748b !important; }
+
+        /* Таблици */
+        .table { color: #334155; }
+        .table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #f8fafc; }
+        .table > thead { background-color: #f1f5f9; color: #475569; border-bottom: 2px solid #e2e8f0;}
+        .table > :not(caption) > * > * { border-bottom-color: #e2e8f0; }
+    </style>
+</head>
 <body>
-    <nav>
-        <a href="/">Home</a> |
-        <a href="/dashboard">Dashboard</a>
+
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg py-3">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="fa-solid fa-chart-line me-2 text-primary"></i>CADS</a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/"><i class="fa-solid fa-house me-1"></i> Начало</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/about"><i class="fa-solid fa-circle-info me-1"></i> За проекта</a></li>
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item"><a class="nav-link text-warning" href="/dashboard"><i class="fa-solid fa-robot me-1"></i> AI Табло</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/history"><i class="fa-solid fa-clock-rotate-left me-1"></i> История</a></li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.role == 'admin' %}
+                        <li class="nav-item me-3"><a class="nav-link text-danger fw-bold" href="/admin"><i class="fa-solid fa-screwdriver-wrench me-1"></i> Админ</a></li>
+                        {% endif %}
+                        <li class="nav-item me-3"><span class="text-light"><i class="fa-solid fa-user me-1 text-primary"></i> {{ current_user.username }}</span></li>
+                        <li class="nav-item"><a class="btn btn-outline-light btn-sm fw-bold" href="/logout">Изход <i class="fa-solid fa-right-from-bracket ms-1"></i></a></li>
+                    {% else %}
+                        <li class="nav-item me-2"><a class="nav-link" href="/login">Вход</a></li>
+                        <li class="nav-item"><a class="btn btn-primary btn-sm px-4 rounded-pill" href="/register">Регистрация</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
     </nav>
-    <hr>
-    {% block content %}
-    <h2>Welcome to Crypto Anomaly Detection System</h2>
-    {% endblock %}
+
+    <!-- Основно съдържание -->
+    <div class="container mt-5">
+        <!-- Системни съобщения -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0" role="alert">
+                {% if category == 'success' %}<i class="fa-solid fa-circle-check me-2"></i>{% endif %}
+                {% if category == 'danger' %}<i class="fa-solid fa-triangle-exclamation me-2"></i>{% endif %}
+                {% if category == 'warning' %}<i class="fa-solid fa-bell me-2"></i>{% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="text-center mt-5 mb-4 text-muted-custom border-top pt-4">
+        <small><i class="fa-brands fa-bitcoin text-warning fs-5 align-middle me-1"></i> Дипломен проект: CADS &copy; 2026 | ПГКПИ Бургас</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
