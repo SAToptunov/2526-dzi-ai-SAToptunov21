@@ -8,6 +8,7 @@ import tensorflow as tf
 import subprocess
 from .extensions import db
 from .models import PredictionLog
+from datetime import datetime
 
 # Пътища до ML моделите (извън web_app папката)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -46,12 +47,12 @@ def generate_live_prediction(user_id):
     df.dropna(inplace=True)
 
     # ПОПРАВКА 1: Махаме .values, за да запазим DataFrame формата с имената на колоните
-    last_60_df = df.iloc[-35:][['Close', 'SMA_7', 'Volatility']]
+    last_window_df = df.iloc[-35:][['Close', 'SMA_7', 'Volatility']]
     current_price = float(df['Close'].iloc[-1])
 
     # 3. AI Предсказание (Подаваме DataFrame на скалера)
-    last_60_scaled = scaler.transform(last_60_df)
-    X_input = last_60_scaled.reshape(1, 35, 3)
+    last_window_scaled = scaler.transform(last_window_df)
+    X_input = last_window_scaled.reshape(1, 35, 3)
     pred_scaled = model.predict(X_input, verbose=0)
 
     # 4. Обратно скалиране
@@ -62,19 +63,47 @@ def generate_live_prediction(user_id):
     dummy_df = pd.DataFrame(dummy, columns=['Close', 'SMA_7', 'Volatility'])
     predicted_price = float(scaler.inverse_transform(dummy_df)[0, 0])
 
-    # 6. Запис в Базата данни
-    diff_pct = abs((predicted_price - current_price) / current_price) if current_price != 0 else 0
-    is_anomaly = bool(diff_pct > 0.05)
+    if current_price != 0:
+        diff_pct = abs(predicted_price - current_price) / current_price
+    else:
+        diff_pct = 0
 
-    new_log = PredictionLog(
-        user_id=user_id,
-        current_price=current_price,
-        predicted_price=predicted_price,
-        is_anomaly=is_anomaly
-    )
-    db.session.add(new_log)
+    is_anomaly = bool(diff_pct > 0.05)  # True ако разликата е над 5%
+
+    # ---------------------------------------------------------
+    # 9. ЗАПИС В БАЗАТА ДАННИ (С проверка за днес)
+    # ---------------------------------------------------------
+    from datetime import datetime  # Гарантираме, че е импортирано
+
+    today = datetime.utcnow().date()
+    start_of_day = datetime(today.year, today.month, today.day)
+
+    # Търсим дали потребителят има прогноза от днес
+    existing_log = PredictionLog.query.filter(
+        PredictionLog.user_id == user_id,
+        PredictionLog.timestamp >= start_of_day
+    ).first()
+
+    if existing_log:
+        # Презаписваме старата прогноза от днес с най-новата
+        existing_log.current_price = current_price
+        existing_log.predicted_price = predicted_price
+        existing_log.is_anomaly = is_anomaly
+        existing_log.timestamp = datetime.utcnow()
+    else:
+        # Създаваме нов запис, ако му е за пръв път днес
+        new_log = PredictionLog(
+            user_id=user_id,
+            symbol='BTC-USD',
+            current_price=current_price,
+            predicted_price=predicted_price,
+            is_anomaly=is_anomaly
+        )
+        db.session.add(new_log)
+
     db.session.commit()
 
+    # 10. Връщане на резултата към уебсайта
     return {
         "dates": df.index[-30:].strftime('%Y-%m-%d').tolist() + ["Tomorrow"],
         "history_prices": df['Close'].iloc[-30:].tolist(),
