@@ -92,7 +92,6 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="/"><i class="fa-solid fa-house me-1"></i> Начало</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/about"><i class="fa-solid fa-circle-info me-1"></i> За проекта</a></li>
                     {% if current_user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link text-warning" href="/dashboard"><i class="fa-solid fa-robot me-1"></i> AI Табло</a></li>
                     <li class="nav-item"><a class="nav-link" href="/history"><i class="fa-solid fa-clock-rotate-left me-1"></i> История</a></li>
@@ -104,10 +103,10 @@
                         <li class="nav-item me-3"><a class="nav-link text-danger fw-bold" href="/admin"><i class="fa-solid fa-screwdriver-wrench me-1"></i> Админ</a></li>
                         {% endif %}
                         <li class="nav-item me-3"><span class="text-light"><i class="fa-solid fa-user me-1 text-primary"></i> {{ current_user.username }}</span></li>
-                        <li class="nav-item"><a class="btn btn-outline-light btn-sm fw-bold" href="/logout">Изход <i class="fa-solid fa-right-from-bracket ms-1"></i></a></li>
+                        <li class="nav-item"><a class="btn btn-outline-light btn-sm fw-bold" href="{{ url_for('auth.logout') }}">Изход <i class="fa-solid fa-right-from-bracket ms-1"></i></a></li>
                     {% else %}
-                        <li class="nav-item me-2"><a class="nav-link" href="/login">Вход</a></li>
-                        <li class="nav-item"><a class="btn btn-primary btn-sm px-4 rounded-pill" href="/register">Регистрация</a></li>
+                        <li class="nav-item me-2"><a class="nav-link" href="{{ url_for('auth.login') }}">Вход</a></li>
+                        <li class="nav-item"><a class="btn btn-primary btn-sm px-4 rounded-pill" href="{{ url_for('auth.register') }}">Регистрация</a></li>
                     {% endif %}
                 </ul>
             </div>

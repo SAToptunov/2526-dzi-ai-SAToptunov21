@@ -9,9 +9,10 @@ import random
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 
-# --- ЗАKОВАВАНЕ НА СЛУЧАЙНОСТТА ---
+# --- FIX SEED ---
 np.random.seed(42)
 tf.random.set_seed(42)
 random.seed(42)
@@ -19,17 +20,14 @@ random.seed(42)
 # --- CONFIG ---
 SYMBOL = 'BTC-USD'
 START_DATE = '2020-01-01'
-LOOK_BACK = 20
-MODELS_DIR = '../../models'
+LOOK_BACK = 35
+MODELS_DIR = '../models'
+PLOTS_DIR = '../plots'
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-print("==================================================")
-print("🚀 СТАРТИРАНЕ НА ПРОДУКЦИОННО ОБУЧЕНИЕ (100% ДАННИ)")
-print("==================================================")
-
-# 1. Сваляне на данните (до днешна дата)
 print("📥 1. Сваляне и обработка...")
+
 df = yf.download(SYMBOL, start=START_DATE)
 if isinstance(df.columns, pd.MultiIndex):
     df.columns = df.columns.get_level_values(0)
@@ -37,31 +35,21 @@ if isinstance(df.columns, pd.MultiIndex):
 # Feature Engineering
 df['SMA_7'] = df['Close'].rolling(window=7).mean()
 df['Volatility'] = df['Close'].rolling(window=7).std()
-
-# НОВО: Добавяме Momentum (Промяната спрямо преди 3 дни)
-# Това казва на модела "Накъде е засилена цената в момента"
-df['Momentum'] = df['Close'] - df['Close'].shift(3)
-
 df.dropna(inplace=True)
 
-# И не забравяй да добавиш 'Momentum' в features за скалирането:
-features = ['Close', 'SMA_7', 'Volatility', 'Momentum']
+# Target
+df['Target'] = df['Close']
 
-print(f"📊 Налични дни за обучение: {len(df)}")
-
-# 2. Скалиране върху ВСИЧКИ данни
+# Scale (на 100% от данните)
+features = ['Close', 'SMA_7', 'Volatility'] # <--- 3 ПРИЗНАКА
 scaler = MinMaxScaler(feature_range=(0, 1))
 
-# ВАЖНО: Вече няма Train/Test split. Скалираме 100% от данните.
 data_scaled = scaler.fit_transform(df[features])
 
-# Запазваме продукционния скалер
 joblib.dump(scaler, os.path.join(MODELS_DIR, 'scaler.gz'))
-print("✅ Скалерът е запазен.")
 
-# 3. Sequencing
-def create_sequences(data, look_back=60):
-    X, y = [],[]
+def create_sequences(data, look_back):
+    X, y = [], []
     for i in range(look_back, len(data)):
         X.append(data[i-look_back:i])
         y.append(data[i, 0])
@@ -69,39 +57,39 @@ def create_sequences(data, look_back=60):
 
 X_all, y_all = create_sequences(data_scaled, LOOK_BACK)
 
-# Отделяме само последните 5% като Validation, за да не "гръмне" EarlyStopping,
-# но реално моделът вижда данните до самия им край.
-val_split = int(len(X_all) * 0.95)
+# Валидационен сплит от края (10%)
+val_split = int(len(X_all) * 0.9)
 X_train, y_train = X_all[:val_split], y_all[:val_split]
 X_val, y_val = X_all[val_split:], y_all[val_split:]
 
-# 4. Обучение на Модела
-print("🧠 2. Обучение на финалния модел...")
+print(f"Shapes -> Train: {X_train.shape}")
+
+# ==========================================
+# 2. MODEL (LSTM)
+# ==========================================
+print("🧠 2. Обучение (LSTM)...")
 
 model = Sequential()
 
-# Поправена структура
-model.add(LSTM(units=128, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
-
-model.add(LSTM(units=64, return_sequences=True))
-
-model.add(LSTM(units=32, return_sequences=False))
-
+model.add(LSTM(units=128, return_sequences=True, input_shape=(LOOK_BACK, 3))) # <--- 3 ПРИЗНАКА
+model.add(Dropout(0.1))
+model.add(LSTM(units=64, return_sequences=False))
+model.add(Dropout(0.1))
 model.add(Dense(units=1))
 
-model.compile(optimizer='adam', loss='huber')
+optimizer = Adam(learning_rate=0.0005)
+model.compile(optimizer=optimizer, loss='huber')
 
-history = model.fit(
+early_stop = EarlyStopping(monitor='val_loss', patience=12, restore_best_weights=True)
+
+model.fit(
     X_train, y_train,
-    epochs=100,
-    batch_size=32,
+    epochs=200,
+    batch_size=16,
     validation_data=(X_val, y_val),
+    callbacks=[early_stop],
     verbose=1
 )
 
-# 5. Запазване
 model.save(os.path.join(MODELS_DIR, 'bitcoin_lstm_live.keras'))
-print("\n==================================================")
-print("✅ ПРОДУКЦИОННИЯТ МОДЕЛ Е ГОТОВ И ЗАПАЗЕН!")
-print("Той вече е обучен на данни до днешния ден и е готов за интеграция в уебсайта.")
-print("==================================================")
+print("✅ LSTM моделът е запазен.")

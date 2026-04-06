@@ -86,10 +86,10 @@ from tensorflow.keras.callbacks import EarlyStopping # Увери се, че т�
 model = Sequential()
 
 model.add(LSTM(units=128, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
-model.add(Dropout(0.2))
+model.add(Dropout(0.1))
 
 model.add(LSTM(units=64, return_sequences=False))
-model.add(Dropout(0.2))
+model.add(Dropout(0.1))
 
 model.add(Dense(units=1))
 
